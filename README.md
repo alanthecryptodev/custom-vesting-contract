@@ -1,4 +1,4 @@
-# ruler-vesting
+# custom-vesting-contract
 
 ## Development
 * run `npm install` to install all node dependencies
