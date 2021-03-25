@@ -55,6 +55,7 @@ contract CustomVesting is Ownable {
     }
 
     function setPause(address _account, bool _pause) external onlyOwner {
+        require(vesting[_account].isPaused != _pause, "Vesting: pause status must change");
         require(vesting[_account].total > 0, "Vesting: user has no vesting schedule");
         vesting[_account].isPaused = _pause;
         emit PauseVesting(_account, _pause);

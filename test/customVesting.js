@@ -48,6 +48,9 @@ describe("CustomVesting", function () {
 
 	it("Should not allow vest if paused", async function () {
 		await vesting.connect(owner).setPause(p1Address, true);
+		// cannot pause if already paused
+		await expect(vesting.connect(owner).setPause(p1Address, true)).to.be.revertedWith("Vesting: pause status must change");
+
 		await expect(vesting.connect(p1).vest()).to.be.revertedWith("Vesting: user's vesting is paused!");
 		await vesting.connect(owner).setPause(p1Address, false);
 	});
