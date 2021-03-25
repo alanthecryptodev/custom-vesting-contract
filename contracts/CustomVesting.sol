@@ -29,12 +29,6 @@ contract CustomVesting is Ownable {
 
     mapping(address => VestingData) public vesting;
 
-    function setPause(address _account, bool _pause) external onlyOwner {
-        require(vesting[_account].total > 0, "Vesting: user has no vesting schedule");
-        vesting[_account].isPaused = _pause;
-        emit PauseVesting(_account, _pause);
-    }
-
     function addVestingSchedule(address _account, IERC20 _token, uint256 _amount, uint256 _startTime, uint256 _endTime) external onlyOwner {
         // initialize vesting schedule for user (one-time only)
         require(vesting[_account].total == vesting[_account].vested, "Vesting: user already has a vesting schedule");
@@ -50,23 +44,39 @@ contract CustomVesting is Ownable {
         emit AddVesting(_account, _amount, _startTime, _endTime);
     }
     
-    function deleteVestingSchedule(address _account) external onlyOwner {
+    function deleteVestingSchedule(address _account, bool _vestForUser) external onlyOwner {
         require(vesting[_account].total > 0, "Vesting: user has no vesting schedule");
+        if (_vestForUser) {
+            _vest(_account);
+        }
         vesting[_account].token.safeTransfer(owner(), vesting[_account].total - vesting[_account].vested);
         delete vesting[_account];
         emit DeleteVesting(_account);
     }
 
+    function setPause(address _account, bool _pause) external onlyOwner {
+        require(vesting[_account].total > 0, "Vesting: user has no vesting schedule");
+        vesting[_account].isPaused = _pause;
+        emit PauseVesting(_account, _pause);
+    }
+
     function vest() external {
-        VestingData storage userVesting = vesting[msg.sender];
+        _vest(msg.sender);
+    }
+
+    function _vest(address _account) internal {
+        VestingData storage userVesting = vesting[_account];
         require(userVesting.total > 0, "Vesting: no vesting schedule!");
+
+        // Now this blocks the owner from deleting the schedule when it's paused,
+        // which might also unwanted behavior. That would require shifting some checks.
         require(!userVesting.isPaused, "Vesting: user's vesting is paused!");
         require(block.timestamp > userVesting.startTime, "Vesting: !started");
-        uint256 toBeReleased = releasableAmount(msg.sender);
+        uint256 toBeReleased = releasableAmount(_account);
         require(toBeReleased > 0, "Vesting: no tokens to release");
 
         userVesting.vested = userVesting.vested + toBeReleased;
-        userVesting.token.safeTransfer(msg.sender, toBeReleased);
+        userVesting.token.safeTransfer(_account, toBeReleased);
     }
 
     function releasableAmount(address _addr) public view returns (uint256) {

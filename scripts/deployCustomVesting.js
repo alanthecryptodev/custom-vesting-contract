@@ -6,7 +6,7 @@ async function main() {
 
 	const provider = deployer.provider;
 	const network = await provider.getNetwork();
-	console.log(`Network: ${network.name} is ${network.name === "kovan"}`);
+	console.log(`Network: ${network.name}`);
 
 	const networkGasPrice = (await provider.getGasPrice()).toNumber();
 	const gasPrice = parseInt(networkGasPrice * 1.05);

@@ -32,7 +32,9 @@ describe("CustomVesting", function () {
 		await expect(
 			vesting.connect(owner).addVestingSchedule(p1Address, vestingToken.address, MINT_AMOUNT, TIMESTAMPS[2], TIMESTAMPS[0])
 		).to.be.revertedWith("Vesting: _startTime >= _endTime");
-		await vesting.connect(owner).addVestingSchedule(p1Address, vestingToken.address, MINT_AMOUNT, TIMESTAMPS[0], TIMESTAMPS[2]);
+		await vesting
+			.connect(owner)
+			.addVestingSchedule(p1Address, vestingToken.address, MINT_AMOUNT, TIMESTAMPS[0], TIMESTAMPS[2]);
 		const { isPaused, vested, total, startTime, endTime } = await vesting.vesting(p1Address);
 		expect(isPaused).to.equal(false);
 		expect(vested).to.equal(0);
@@ -62,15 +64,24 @@ describe("CustomVesting", function () {
 
 	it("Should delete user's vesting schedule", async function () {
 		// Should not allow deletion of non-existent schedule
-		await expect(vesting.connect(owner).deleteVestingSchedule(bogeyAddress)).to.be.revertedWith(
+		await expect(vesting.connect(owner).deleteVestingSchedule(bogeyAddress, true)).to.be.revertedWith(
 			"Vesting: user has no vesting schedule"
 		);
 
+		await time.increaseTo(TIMESTAMPS[2]);
+		await time.advanceBlock();
 		const unvestedBal = await vestingToken.balanceOf(vesting.address);
-		await vesting.connect(owner).deleteVestingSchedule(p1Address);
+		const p1BalBefore = await vestingToken.balanceOf(p1Address);
+		const releasableBal = await vesting.releasableAmount(p1Address);
+		await vesting.connect(owner).deleteVestingSchedule(p1Address, true);
+
+		// User should receive his "vested" amount, rest goes to owner
+		const p1BalAfter = await vestingToken.balanceOf(p1Address);
+		expect(p1BalAfter).to.equal(p1BalBefore.add(releasableBal));
+
 		// owner should receive the unvested tokens
 		const ownerBal = await vestingToken.balanceOf(ownerAddress);
-		expect(ownerBal).to.equal(unvestedBal);
+		expect(ownerBal).to.equal(unvestedBal - releasableBal);
 
 		// vesting data should be deleted
 		const { isPaused, vested, total, startTime, endTime } = await vesting.vesting(p1Address);
@@ -81,8 +92,6 @@ describe("CustomVesting", function () {
 		expect(endTime).to.equal(0);
 
 		// should not allow vesting once user is deleted
-		await expect(vesting.connect(owner).vest()).to.be.revertedWith(
-			"Vesting: no vesting schedule!"
-		);
+		await expect(vesting.connect(owner).vest()).to.be.revertedWith("Vesting: no vesting schedule!");
 	});
 });
